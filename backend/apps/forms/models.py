@@ -17,6 +17,8 @@ class Form(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     is_template = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    # publishing/draft control
+    is_published = models.BooleanField(default=True)
     allow_multiple_submissions = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -30,6 +32,8 @@ class Form(models.Model):
     rate_limit_count = models.PositiveIntegerField(default=5)
     rate_limit_period = models.PositiveIntegerField(default=3600)
     allow_partial_saves = models.BooleanField(default=True)
+    # optional cap on the number of accepted (non-draft) submissions
+    submission_limit = models.PositiveIntegerField(null=True, blank=True, help_text='Optional maximum number of non-draft submissions allowed for this form')
 
     def __str__(self):
         return self.title

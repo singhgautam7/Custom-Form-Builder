@@ -49,18 +49,31 @@ class SubmissionViewSet(viewsets.ModelViewSet):
             if not rl.is_within_limit(form.rate_limit_count):
                 return Response({'detail': 'Rate limit exceeded.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
+        # enforce submission cap if set
+        if form.submission_limit is not None:
+            current_count = form.submissions.filter(is_draft=False).count()
+            if current_count >= form.submission_limit:
+                return Response({'detail': 'Submission limit reached for this form.'}, status=status.HTTP_403_FORBIDDEN)
+
         payload = request.data.copy()
         payload['form'] = str(form.id)
         payload['ip_address'] = ip
 
-        # Use a DB transaction so submission + answers are atomic and rate-limit increments are consistent
+        # Use a DB transaction and lock the Form row to enforce submission_limit safely under concurrency
         with transaction.atomic():
+            locked_form = Form.objects.select_for_update().get(id=form.id)
+            # re-check submission cap under lock
+            if locked_form.submission_limit is not None:
+                current_count = locked_form.submissions.filter(is_draft=False).count()
+                if current_count >= locked_form.submission_limit:
+                    return Response({'detail': 'Submission limit reached for this form.'}, status=status.HTTP_403_FORBIDDEN)
+
             serializer = self.get_serializer(data=payload)
             serializer.is_valid(raise_exception=True)
             submission = serializer.save()
 
             # increment rate limit
-            if form.rate_limit_enabled:
+            if locked_form.rate_limit_enabled:
                 rl.increment_count()
 
         # if not a draft, mark completed and send notifications

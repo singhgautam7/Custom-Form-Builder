@@ -2,26 +2,31 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from .models import Form, Question
-from strings import QUESTION_OPTIONS_HELP
+
+
+@admin.action(description='Delete non-draft submissions for selected forms')
+def reset_submissions(modeladmin, request, queryset):
+    for form in queryset:
+        form.submissions.filter(is_draft=False).delete()
+
+
+@admin.action(description='Clear submission limit for selected forms')
+def clear_submission_limit(modeladmin, request, queryset):
+    queryset.update(submission_limit=None)
+
+
+@admin.register(Form)
+class FormAdmin(admin.ModelAdmin):
+    list_display = ('title', 'created_by', 'is_published', 'submission_limit', 'created_at')
+    list_filter = ('is_published',)
+    search_fields = ('title', 'slug')
+    actions = [reset_submissions, clear_submission_limit]
 
 
 class QuestionAdminForm(forms.ModelForm):
     class Meta:
         model = Question
         fields = '__all__'
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        qt = None
-        # Prefer bound form data (when changing the type in the admin UI), then instance, then initial
-        if self.data and self.data.get('question_type'):
-            qt = self.data.get('question_type')
-        elif self.instance and getattr(self.instance, 'question_type', None):
-            qt = self.instance.question_type
-        elif 'question_type' in self.initial:
-            qt = self.initial.get('question_type')
-        if qt:
-            self.fields['options'].help_text = QUESTION_OPTIONS_HELP.get(qt, '')
 
     def clean(self):
         cleaned = super().clean()
@@ -34,12 +39,6 @@ class QuestionAdminForm(forms.ModelForm):
             # translate model ValidationError into form ValidationError
             raise forms.ValidationError(e.message_dict or e.messages)
         return cleaned
-
-
-@admin.register(Form)
-class FormAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'created_by', 'is_active', 'is_template', 'created_at')
-    search_fields = ('title', 'created_by__username')
 
 
 @admin.register(Question)

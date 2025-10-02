@@ -83,3 +83,26 @@ class SubmissionFlowTests(TestCase):
         # at most rate_limit_count (2) successes
         successes = sum(1 for s in results if s == 201)
         self.assertLessEqual(successes, 2)
+
+    def test_submission_limit_enforced_and_admin_reset(self):
+        # set submission limit to 2
+        self.form.submission_limit = 2
+        self.form.rate_limit_count = 100  # avoid rate-limit interference
+        self.form.save()
+        data = {'is_draft': False, 'answers': [{'question': str(self.q.id), 'answer_text': 'A'}]}
+        # two submissions succeed
+        for i in range(2):
+            r = self.client.post(f'/api/forms/{self.form.slug}/submissions/', data=json.dumps(data), content_type='application/json')
+            self.assertEqual(r.status_code, 201)
+
+        # third should be rejected due to submission_limit
+        r3 = self.client.post(f'/api/forms/{self.form.slug}/submissions/', data=json.dumps(data), content_type='application/json')
+        self.assertEqual(r3.status_code, 403)
+
+        # Now simulate admin reset by calling admin action (via admin API is read-only here),
+        # so perform cleanup using ORM to simulate the admin action
+        self.form.submissions.filter(is_draft=False).delete()
+
+        # after reset, submissions should be accepted again
+        r4 = self.client.post(f'/api/forms/{self.form.slug}/submissions/', data=json.dumps(data), content_type='application/json')
+        self.assertEqual(r4.status_code, 201)

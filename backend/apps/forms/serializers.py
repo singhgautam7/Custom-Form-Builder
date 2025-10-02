@@ -34,6 +34,7 @@ class FormSerializer(serializers.ModelSerializer):
     class Meta:
         model = Form
         fields = ('id', 'title', 'description', 'created_by', 'is_template', 'is_active', 'allow_multiple_submissions',
+                  'is_published', 'submission_limit',
                   'created_at', 'updated_at', 'slug', 'expires_at', 'is_password_protected', 'access_code',
                   'enable_email_notifications', 'notification_emails', 'rate_limit_enabled', 'rate_limit_count',
                   'rate_limit_period', 'allow_partial_saves', 'questions')

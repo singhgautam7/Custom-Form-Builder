@@ -66,7 +66,13 @@ Note: API routes for Forms, Questions and Submissions are mounted under `/api/` 
 
 - User authentication (register, login, refresh tokens, email verification, logout).
 - Form builder data model: Forms, Questions (various question types: text, textarea, number, date, dropdown, radio, checkbox, multiselect), Options JSON for choice questions.
-- Submissions: draft (partial save) and finalize flows, per-submission answers.
+- Submissions & Forms lifecycle:
+	- Forms can be saved as drafts (unpublished) and later published. Use owner-only endpoints to publish/unpublish a form:
+		- POST /api/forms/{slug}/publish/ — publish the form (owner only)
+		- POST /api/forms/{slug}/unpublish/ — unpublish the form (owner only)
+	- Unpublished forms (`is_published=False`) are not available to public users and will return 404/forbidden on retrieval.
+	- Draft submissions (partial saves) are supported and can be finalized later.
+- Submission caps: forms can be configured with an optional `submission_limit` which is a maximum number of accepted non-draft submissions. If the cap is reached, the Submissions API will reject new submissions with HTTP 403 and message: `Submission limit reached for this form.`
 - Rate limiting per-form and per-IP with a persisted counter and owner/admin endpoints to reset or inspect limits.
 - Notifications: email notifications on new submissions (configurable per-form).
 - Reporting: paginated submissions report and CSV streaming export (owner-only).

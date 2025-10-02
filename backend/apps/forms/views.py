@@ -44,6 +44,9 @@ class FormViewSet(viewsets.ModelViewSet):
         # check expiry
         if form.is_expired():
             return Response({'detail': 'Form expired.'}, status=status.HTTP_410_GONE)
+        # check published state
+        if not form.is_published and form.created_by != request.user:
+            return Response({'detail': 'Form not published.'}, status=status.HTTP_404_NOT_FOUND)
         # password protection handled via verify-access endpoint
         serializer = self.get_serializer(form)
         return Response(serializer.data)
@@ -99,6 +102,26 @@ class FormViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         new_form = serializer.save()
         return Response(FormSerializer(new_form).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='publish')
+    def publish(self, request, slug=None):
+        """Publish a form (owner-only)."""
+        form = get_object_or_404(Form, slug=slug)
+        if form.created_by != request.user:
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        form.is_published = True
+        form.save(update_fields=['is_published'])
+        return Response({'detail': 'Form published.'})
+
+    @action(detail=True, methods=['post'], url_path='unpublish')
+    def unpublish(self, request, slug=None):
+        """Unpublish a form (owner-only)."""
+        form = get_object_or_404(Form, slug=slug)
+        if form.created_by != request.user:
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        form.is_published = False
+        form.save(update_fields=['is_published'])
+        return Response({'detail': 'Form unpublished.'})
 
     @action(detail=True, methods=['post'])
     def verify_access(self, request, slug=None):
@@ -246,7 +269,7 @@ class FormViewSet(viewsets.ModelViewSet):
         form = get_object_or_404(Form, slug=slug)
         if form.created_by != request.user:
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
-        allowed = ['is_active', 'allow_multiple_submissions', 'expires_at', 'rate_limit_enabled', 'rate_limit_count', 'rate_limit_period', 'is_password_protected', 'access_code']
+        allowed = ['is_active', 'allow_multiple_submissions', 'expires_at', 'rate_limit_enabled', 'rate_limit_count', 'rate_limit_period', 'is_password_protected', 'access_code', 'is_published', 'submission_limit']
         for k, v in request.data.items():
             if k not in allowed:
                 return Response({'detail': f'Field {k} not allowed'}, status=status.HTTP_400_BAD_REQUEST)
