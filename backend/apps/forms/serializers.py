@@ -4,10 +4,27 @@ from django.utils import timezone
 
 
 class QuestionSerializer(serializers.ModelSerializer):
+    form = serializers.PrimaryKeyRelatedField(read_only=True)
+
     class Meta:
         model = Question
         exclude = ()
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at', 'form')
+
+    def validate(self, data):
+        # Use the model's clean() logic to validate options and consistency
+        # Create a transient Question object to run validation
+        obj = Question(**{**data})
+        try:
+            obj.clean()
+        except Exception as e:
+            # If it's a Django ValidationError, convert to DRF ValidationError
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            from rest_framework.exceptions import ValidationError as DRFValidationError
+            if isinstance(e, DjangoValidationError):
+                raise DRFValidationError(e.message_dict if hasattr(e, 'message_dict') else e.messages)
+            raise
+        return data
 
 
 class FormSerializer(serializers.ModelSerializer):

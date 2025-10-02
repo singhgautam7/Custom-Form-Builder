@@ -14,6 +14,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 import datetime
+import secrets
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,11 +28,20 @@ load_dotenv(BASE_DIR / '.env')
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    # generate a reasonably strong secret for dev if not provided
+    SECRET_KEY = secrets.token_urlsafe(50)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False').lower() in ('1', 'true', 'yes')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',')
+
+# Deployment / security settings (read from .env with safe dev defaults)
+SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0'))
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False').lower() in ('1', 'true', 'yes')
+SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', str(not DEBUG)).lower() in ('1', 'true', 'yes')
+CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', str(not DEBUG)).lower() in ('1', 'true', 'yes')
 
 
 # Application definition
@@ -179,6 +189,13 @@ else:
 RATE_LIMIT_REGISTER = os.getenv('RATE_LIMIT_REGISTER', '10/h')
 RATE_LIMIT_LOGIN = os.getenv('RATE_LIMIT_LOGIN', '30/h')
 RATE_LIMIT_RESEND_VERIFICATION = os.getenv('RATE_LIMIT_RESEND_VERIFICATION', '10/h')
+
+# Celery configuration (read broker from env; default to redis)
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', CELERY_BROKER_URL)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
 
 # Simple JWT configuration (lifetime in seconds)
 access_seconds = int(os.getenv('SIMPLE_JWT_ACCESS_TOKEN_LIFETIME', '3600'))

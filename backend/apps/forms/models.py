@@ -80,6 +80,8 @@ class Question(models.Model):
     is_required = models.BooleanField(default=False)
     order = models.PositiveIntegerField()
     placeholder = models.CharField(max_length=255, blank=True, null=True)
+    help_text = models.TextField(blank=True, null=True)
+    hint = models.CharField(max_length=255, blank=True, null=True)
     min_length = models.PositiveIntegerField(null=True, blank=True)
     max_length = models.PositiveIntegerField(null=True, blank=True)
     min_value = models.DecimalField(null=True, blank=True, max_digits=10, decimal_places=2)

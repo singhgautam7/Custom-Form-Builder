@@ -22,5 +22,6 @@ urlpatterns = [
     path('forms/<slug:form_slug>/questions/', question_list, name='question-list'),
     path('forms/<slug:form_slug>/questions/<uuid:id>/', question_detail, name='question-detail'),
     path('forms/<slug:form_slug>/questions/reorder/', QuestionViewSet.as_view({'patch': 'reorder'}), name='question-reorder'),
+    path('forms/<slug:form_slug>/questions/<uuid:id>/validate/', QuestionViewSet.as_view({'post': 'validate_answer'}), name='question-validate'),
     path('forms/<slug:form_slug>/submissions/', include('apps.submissions.urls')),
 ]

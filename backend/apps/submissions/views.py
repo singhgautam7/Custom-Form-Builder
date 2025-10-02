@@ -16,6 +16,7 @@ from apps.forms.models import Form, Question
 from apps.ratelimit.models import SubmissionRateLimit
 from apps.notifications.models import FormNotificationLog
 from .serializers import SubmissionSerializer
+from apps.notifications.tasks import dispatch_notification
 
 
 @extend_schema(
@@ -68,12 +69,11 @@ class SubmissionViewSet(viewsets.ModelViewSet):
             submission.completed_at = timezone.now()
             submission.save(update_fields=['completed_at'])
             if form.enable_email_notifications and form.notification_emails:
-                for to in form.notification_emails:
-                    try:
-                        send_mail(f'New submission for {form.title}', 'A new submission was received.', settings.DEFAULT_FROM_EMAIL, [to])
-                        FormNotificationLog.objects.create(form=form, submission=submission, to_email=to, success=True)
-                    except Exception as e:
-                        FormNotificationLog.objects.create(form=form, submission=submission, to_email=to, success=False, message=str(e))
+                def _notify():
+                    for to in form.notification_emails:
+                        dispatch_notification(form, submission, f'New submission for {form.title}', 'A new submission was received.', to)
+
+                transaction.on_commit(_notify)
 
         return Response(SubmissionSerializer(submission).data, status=status.HTTP_201_CREATED)
 
@@ -91,11 +91,10 @@ class SubmissionViewSet(viewsets.ModelViewSet):
             submission.save(update_fields=['is_draft', 'completed_at'])
             form = submission.form
             if form.enable_email_notifications and form.notification_emails:
-                for to in form.notification_emails:
-                    try:
-                        send_mail(f'New submission for {form.title}', 'A submission was finalized.', settings.DEFAULT_FROM_EMAIL, [to])
-                        FormNotificationLog.objects.create(form=form, submission=submission, to_email=to, success=True)
-                    except Exception as e:
-                        FormNotificationLog.objects.create(form=form, submission=submission, to_email=to, success=False, message=str(e))
+                def _notify_finalize():
+                    for to in form.notification_emails:
+                        dispatch_notification(form, submission, f'New submission for {form.title}', 'A submission was finalized.', to)
+
+                transaction.on_commit(_notify_finalize)
 
         return Response(SubmissionSerializer(submission).data)

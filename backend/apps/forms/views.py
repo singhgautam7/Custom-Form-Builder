@@ -6,6 +6,11 @@ from .serializers import FormSerializer, QuestionSerializer
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from apps.core.utils import get_client_ip
+from django.http import StreamingHttpResponse
+import csv
+import io
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import ValidationError as DRFValidationError
 
 
 class IsOwner(permissions.BasePermission):
@@ -42,6 +47,40 @@ class FormViewSet(viewsets.ModelViewSet):
         # password protection handled via verify-access endpoint
         serializer = self.get_serializer(form)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='client-schema')
+    def client_schema(self, request, slug=None):
+        """Return a lightweight client-side JSON schema useful for rendering the form.
+
+        The schema includes question id, type, label, required, options, help_text, hint, and constraints.
+        """
+        form = get_object_or_404(Form, slug=slug)
+        schema = {'id': str(form.id), 'title': form.title, 'description': form.description, 'questions': []}
+        for q in form.questions.all():
+            qschema = {
+                'id': str(q.id),
+                'type': q.question_type,
+                'label': q.question_text,
+                'required': q.is_required,
+                'order': q.order,
+                'placeholder': q.placeholder,
+                'help_text': q.help_text,
+                'hint': q.hint,
+            }
+            if q.options is not None:
+                qschema['options'] = q.options
+            # numeric constraints
+            if q.min_value is not None:
+                qschema['min_value'] = float(q.min_value)
+            if q.max_value is not None:
+                qschema['max_value'] = float(q.max_value)
+            # length constraints
+            if q.min_length is not None:
+                qschema['min_length'] = q.min_length
+            if q.max_length is not None:
+                qschema['max_length'] = q.max_length
+            schema['questions'].append(qschema)
+        return Response(schema)
 
     @action(detail=True, methods=['post'])
     def duplicate(self, request, slug=None):
@@ -84,13 +123,55 @@ class FormViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='ratelimit/status')
     def ratelimit_status(self, request, slug=None):
         form = get_object_or_404(Form, slug=slug)
-        ip = request.query_params.get('ip') or request.META.get('REMOTE_ADDR')
+        ip = request.query_params.get('ip') or get_client_ip(request)
         from apps.ratelimit.models import SubmissionRateLimit
         try:
             rl = SubmissionRateLimit.objects.get(form=form, ip_address=ip)
             return Response({'ip': ip, 'submission_count': rl.submission_count, 'first_submission_at': rl.first_submission_at, 'last_submission_at': rl.last_submission_at, 'is_blocked': rl.is_blocked, 'blocked_until': rl.blocked_until})
         except SubmissionRateLimit.DoesNotExist:
             return Response({'ip': ip, 'submission_count': 0})
+
+    @action(detail=True, methods=['get'], url_path='submissions/report')
+    def submissions_report(self, request, slug=None):
+        """Return paginated submissions for a form (owner-only)."""
+        form = get_object_or_404(Form, slug=slug)
+        if form.created_by != request.user:
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        qs = form.submissions.filter(is_draft=False).order_by('-submitted_at')
+        # simple pagination
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 25))
+        start = (page - 1) * page_size
+        end = start + page_size
+        items = qs[start:end]
+        data = []
+        for s in items:
+            data.append({'id': str(s.id), 'submitted_by': str(s.submitted_by) if s.submitted_by else None, 'submitted_at': s.submitted_at, 'ip_address': s.ip_address})
+        return Response({'count': qs.count(), 'page': page, 'page_size': page_size, 'results': data})
+
+    @action(detail=True, methods=['get'], url_path='submissions/export')
+    def submissions_export(self, request, slug=None):
+        """Stream CSV export of submissions (owner-only)."""
+        form = get_object_or_404(Form, slug=slug)
+        if form.created_by != request.user:
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        qs = form.submissions.filter(is_draft=False).order_by('submitted_at')
+
+        def row_generator():
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            # header
+            writer.writerow(['submission_id', 'submitted_by', 'submitted_at', 'ip_address'])
+            yield buf.getvalue()
+            buf.seek(0)
+            buf.truncate(0)
+            for s in qs:
+                writer.writerow([str(s.id), str(s.submitted_by) if s.submitted_by else '', s.submitted_at.isoformat() if s.submitted_at else '', s.ip_address or ''])
+                yield buf.getvalue()
+                buf.seek(0)
+                buf.truncate(0)
+
+        return StreamingHttpResponse(row_generator(), content_type='text/csv')
 
     @action(detail=True, methods=['post'], url_path='ratelimit/reset')
     def ratelimit_reset(self, request, slug=None):
@@ -155,3 +236,36 @@ class QuestionViewSet(viewsets.ModelViewSet):
             q.order = idx
             q.save()
         return Response({'detail': 'Reordered'})
+
+    @action(detail=True, methods=['post'], url_path='validate')
+    def validate_answer(self, request, form_slug=None, id=None):
+        """Validate a single answer payload against the question rules.
+
+        Expected payloads vary by question type, e.g.:
+        - text/email: {"answer_text": "..."}
+        - number: {"answer_number": 123}
+        - date: {"answer_date": "2025-10-03"}
+        - checkbox/multiselect: {"answer_choices": [..]}
+        """
+        form = get_object_or_404(Form, slug=form_slug)
+        question = get_object_or_404(Question, id=id, form=form)
+        # pick the value out of request.data according to question type
+        payload = request.data
+        try:
+            if question.question_type in ('text', 'textarea', 'email'):
+                val = payload.get('answer_text')
+            elif question.question_type == 'number':
+                val = payload.get('answer_number')
+            elif question.question_type == 'date':
+                val = payload.get('answer_date')
+            elif question.question_type in ('dropdown', 'radio'):
+                val = payload.get('answer_text')
+            elif question.question_type in ('checkbox', 'multiselect'):
+                val = payload.get('answer_choices')
+            else:
+                val = payload.get('answer_text')
+
+            question.validate_answer(val)
+        except DjangoValidationError as e:
+            raise DRFValidationError(e.message_dict if hasattr(e, 'message_dict') else e.messages)
+        return Response({'detail': 'Valid'})
