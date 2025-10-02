@@ -121,6 +121,7 @@ media/
 
 # nextJs dependencies
 /node_modules
+frontend/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
