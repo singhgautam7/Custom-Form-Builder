@@ -1,0 +1,6 @@
+﻿Django>=5.2.7
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+django-ratelimit
+psycopg2-binary
