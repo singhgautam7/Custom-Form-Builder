@@ -11,19 +11,25 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+import datetime
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load .env from backend folder if present
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-)3m*_&9lbj+-a_(wkqy@%jt+us)y9=wd2)*^y5nb0!aq0rm@df'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('1', 'true', 'yes')
 
 ALLOWED_HOSTS = []
 
@@ -40,6 +46,8 @@ INSTALLED_APPS = [
     # Third-party
     'rest_framework',
     'corsheaders',
+    'drf_spectacular',
+    'rest_framework_simplejwt.token_blacklist',
 
     # Local apps
     'apps.authentication',
@@ -137,6 +145,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # CORS (development-friendly default)
@@ -144,3 +153,60 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 # Allow JSONField default to be list where applicable
 DEFAULT_JSON_FIELD = list
+
+# drf-spectacular
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Custom Form Builder API',
+    'DESCRIPTION': 'API schema for Custom Form Builder',
+    'VERSION': '1.0.0',
+}
+
+# Email settings (from env)
+EMAIL_HOST = os.getenv('EMAIL_HOST')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 0)) if os.getenv('EMAIL_PORT') else None
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@example.com')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'False').lower() in ('1', 'true', 'yes')
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('1', 'true', 'yes')
+if not EMAIL_HOST:
+    # development-friendly default
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+# Rate limit defaults
+RATE_LIMIT_REGISTER = os.getenv('RATE_LIMIT_REGISTER', '10/h')
+RATE_LIMIT_LOGIN = os.getenv('RATE_LIMIT_LOGIN', '30/h')
+RATE_LIMIT_RESEND_VERIFICATION = os.getenv('RATE_LIMIT_RESEND_VERIFICATION', '10/h')
+
+# Simple JWT configuration (lifetime in seconds)
+access_seconds = int(os.getenv('SIMPLE_JWT_ACCESS_TOKEN_LIFETIME', '3600'))
+refresh_seconds = int(os.getenv('SIMPLE_JWT_REFRESH_TOKEN_LIFETIME', '1209600'))
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': datetime.timedelta(seconds=access_seconds),
+    'REFRESH_TOKEN_LIFETIME': datetime.timedelta(seconds=refresh_seconds),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': True,
+}
+
+# Database from env (basic sqlite support via DATABASE_URL)
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    if DATABASE_URL.startswith('sqlite:///'):
+        db_path = DATABASE_URL.replace('sqlite:///', '')
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / db_path,
+            }
+        }
+    else:
+        # keep default sqlite as fallback; for full DATABASE_URL parsing add dj-database-url
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+

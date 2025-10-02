@@ -6,7 +6,7 @@ class SubmissionRateLimit(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     form = models.ForeignKey('forms.Form', on_delete=models.CASCADE, related_name='rate_limits')
     ip_address = models.GenericIPAddressField()
-    submission_count = models.PositiveIntegerField(default=1)
+    submission_count = models.PositiveIntegerField(default=0)
     first_submission_at = models.DateTimeField(auto_now_add=True)
     last_submission_at = models.DateTimeField(auto_now=True)
     is_blocked = models.BooleanField(default=False)
