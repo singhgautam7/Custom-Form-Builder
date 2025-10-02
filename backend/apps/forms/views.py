@@ -149,6 +149,60 @@ class FormViewSet(viewsets.ModelViewSet):
             data.append({'id': str(s.id), 'submitted_by': str(s.submitted_by) if s.submitted_by else None, 'submitted_at': s.submitted_at, 'ip_address': s.ip_address})
         return Response({'count': qs.count(), 'page': page, 'page_size': page_size, 'results': data})
 
+    @action(detail=True, methods=['get'], url_path='analytics')
+    def analytics(self, request, slug=None):
+        """Return lightweight analytics for the form (owner-only).
+
+        Provides:
+        - total_submissions: number of completed submissions
+        - submissions_last_24h: count
+        - avg_completion_seconds: average time from creation -> completed (if available)
+        - question_stats: per-question simple stats (counts, choice distribution where applicable)
+        """
+        form = get_object_or_404(Form, slug=slug)
+        if form.created_by != request.user:
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+        qs = form.submissions.filter(is_draft=False)
+        total = qs.count()
+        now = timezone.now()
+        last_24 = qs.filter(submitted_at__gte=now - timezone.timedelta(hours=24)).count()
+
+        # average completion time (completed_at - created_at) in seconds
+        times = []
+        for s in qs.exclude(completed_at__isnull=True):
+            if s.submitted_at and s.created_at:
+                diff = (s.completed_at - s.created_at).total_seconds()
+                times.append(diff)
+        avg_completion = sum(times) / len(times) if times else None
+
+        question_stats = []
+        for q in form.questions.all():
+            stat = {'id': str(q.id), 'question_text': q.question_text, 'type': q.question_type, 'responses': 0}
+            answers = q.answers.filter(submission__is_draft=False)
+            stat['responses'] = answers.count()
+            if q.question_type in ('dropdown', 'radio', 'checkbox', 'multiselect') and q.options:
+                # q.options is JSON list of option strings; count occurrences
+                counts = {}
+                for a in answers:
+                    # answer stored in answer_text or answer_choices depending on type
+                    if a.answer_text:
+                        val = a.answer_text
+                        counts[val] = counts.get(val, 0) + 1
+                    elif a.answer_choices:
+                        # assume a.answer_choices is stored as list-like (JSONField)
+                        for choice in a.answer_choices:
+                            counts[choice] = counts.get(choice, 0) + 1
+                stat['choices'] = counts
+            question_stats.append(stat)
+
+        return Response({
+            'total_submissions': total,
+            'submissions_last_24h': last_24,
+            'avg_completion_seconds': avg_completion,
+            'question_stats': question_stats,
+        })
+
     @action(detail=True, methods=['get'], url_path='submissions/export')
     def submissions_export(self, request, slug=None):
         """Stream CSV export of submissions (owner-only)."""

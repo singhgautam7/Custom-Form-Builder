@@ -22,14 +22,13 @@ from apps.notifications.tasks import dispatch_notification
 @extend_schema(
     parameters=[
         OpenApiParameter(name='form_slug', location=OpenApiParameter.PATH, type=OpenApiTypes.STR),
-        OpenApiParameter(name='pk', location=OpenApiParameter.PATH, type=OpenApiTypes.UUID),
         OpenApiParameter(name='id', location=OpenApiParameter.PATH, type=OpenApiTypes.UUID),
     ]
 )
 class SubmissionViewSet(viewsets.ModelViewSet):
     serializer_class = SubmissionSerializer
     permission_classes = [AllowAny]
-    lookup_field = 'pk'
+    lookup_field = 'id'
 
     def get_queryset(self):
         form_slug = self.kwargs.get('form_slug')
@@ -77,10 +76,10 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
         return Response(SubmissionSerializer(submission).data, status=status.HTTP_201_CREATED)
 
-    @extend_schema(parameters=[OpenApiParameter(name='pk', location=OpenApiParameter.PATH, type=OpenApiTypes.UUID)])
+    @extend_schema(parameters=[OpenApiParameter(name='id', location=OpenApiParameter.PATH, type=OpenApiTypes.UUID)])
     @action(detail=True, methods=['post'], url_path='finalize')
-    def finalize(self, request, form_slug=None, pk=None):
-        submission = get_object_or_404(FormSubmission, pk=pk)
+    def finalize(self, request, form_slug=None, id=None):
+        submission = get_object_or_404(FormSubmission, id=id)
         if not submission.is_draft:
             return Response({'detail': 'Submission already finalized.'}, status=status.HTTP_400_BAD_REQUEST)
 
