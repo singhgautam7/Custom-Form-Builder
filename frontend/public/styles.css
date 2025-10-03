@@ -1,25 +1,22 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
+﻿/* Custom site styles (no Tailwind directives) - safe for direct inclusion */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
 
-/* Basic page sizing */
-html, body, #__next {
-  height: 100%;
-}
-
-/* Design tokens */
 :root{
-  --bg: #f3f4f6; /* neutral-100 */
-  --surface-1: #ffffff; /* cards, surfaces */
-  --surface-2: #eef2ff; /* subtle sidebar/header tint */
-  --primary: #659DFB; /* brand accent */
-  --primary-600: #4f8ae6;
+  --bg: #f3f4f6;
+  --surface-1: #ffffff;
+  --surface-2: #eef2ff;
+  --primary: #659DFB; /* updated accent */
+  --primary-600: #4c7be1;
   --muted: #6b7280;
   --text: #0f172a;
   --radius: 0.5rem;
 }
+
+h1 { font-size: 1.75rem; line-height: 1.1; font-weight: 700 }
+h2 { font-size: 1.25rem; line-height: 1.2; font-weight: 600 }
+h3 { font-size: 1.125rem; font-weight: 600 }
+
+html, body, #__next { height: 100%; }
 
 body{
   background-color: var(--bg);
@@ -29,16 +26,12 @@ body{
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-
-/* Headings */
 h1 { font-size: 1.75rem; line-height: 1.1; font-weight: 700 }
 h2 { font-size: 1.25rem; line-height: 1.2; font-weight: 600 }
 h3 { font-size: 1.125rem; font-weight: 600 }
 
-/* Small helpers */
 .footer{ color: var(--muted); margin-top: 2rem; font-size: 0.875rem }
 
-/* Note: component-level utility classes were intentionally avoided to keep PostCSS
-   processing simple in this environment. Use direct Tailwind utility classes
-   in components (Header, Sidebar, etc.) to get consistent styling. */
-
+/* Small adjustments for card/button visuals */
+.card { background: var(--surface-1); border-radius: 0.75rem; box-shadow: 0 6px 18px rgba(15,23,42,0.06); padding: 1rem }
+.btn { border-radius: 0.5rem; padding: 0.6rem 1.25rem }

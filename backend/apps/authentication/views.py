@@ -20,14 +20,15 @@ import uuid
 from django.core.mail import send_mail
 from django.conf import settings
 from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
 
 User = get_user_model()
 
 
+@method_decorator(ratelimit(key='ip', rate=lambda group, request: settings.RATE_LIMIT_REGISTER, block=True), name='dispatch')
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
-    @ratelimit(key='ip', rate=lambda request: settings.RATE_LIMIT_REGISTER, block=True)
     def create(self, request, *args, **kwargs):
         resp = super().create(request, *args, **kwargs)
         user = User.objects.get(pk=resp.data['id'])
@@ -42,10 +43,10 @@ class RegisterView(generics.CreateAPIView):
         return Response({'detail': 'User created. Verification email sent.'}, status=status.HTTP_201_CREATED)
 
 
+@method_decorator(ratelimit(key='ip', rate=lambda group, request: settings.RATE_LIMIT_LOGIN, block=True), name='dispatch')
 class LoginView(GenericAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = LoginSerializer
-    @ratelimit(key='ip', rate=lambda request: settings.RATE_LIMIT_LOGIN, block=True)
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -76,10 +77,10 @@ class VerifyEmailView(GenericAPIView):
         return Response({'detail': 'Email verified.'})
 
 
+@method_decorator(ratelimit(key='ip', rate=lambda group, request: settings.RATE_LIMIT_RESEND_VERIFICATION, block=True), name='dispatch')
 class ResendVerificationView(GenericAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = EmailSerializer
-    @ratelimit(key='ip', rate=lambda request: settings.RATE_LIMIT_RESEND_VERIFICATION, block=True)
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)

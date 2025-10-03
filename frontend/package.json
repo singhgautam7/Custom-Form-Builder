@@ -2,21 +2,39 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
-    "start": "next start",
-    "lint": "biome check",
-    "format": "biome format --write"
-  },
+
   "dependencies": {
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.5.4"
+    "next": "15.5.4",
+  "@headlessui/react": "*",
+  "@hookform/resolvers": "^3.2.0",
+    "react-hook-form": "^7.50.0",
+  "react-icons": "^4.10.1",
+    "clsx": "^1.2.1",
+    "next-themes": "^0.2.1",
+    "yup": "^1.2.0",
+  "@mantine/core": "^8.3.0",
+  "@mantine/hooks": "^8.3.0",
+  "@emotion/react": "^11.11.0",
+  "@emotion/server": "^11.11.0",
+  "@emotion/styled": "^11.11.0"
+    ,"@mantine/ssr": "^1.0.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
+    "tailwindcss": "^3.4.8",
+    "postcss": "8.4.24",
+    "autoprefixer": "10.4.14",
     "@biomejs/biome": "2.2.0"
+  },
+  "scripts": {
+  "generate:css": "tailwindcss -i ./src/app/globals.css -o ./public/generated-tailwind.css --config ./tailwind.config.js",
+    "dev": "next dev",
+  "build:css": "npm run generate:css",
+  "prebuild": "npm run generate:css",
+    "build": "next build",
+    "start": "next start",
+    "test:unit": "node ./test-runner.js",
+    "test": "node ./test-runner.js"
   }
 }
