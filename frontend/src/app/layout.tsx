@@ -3,9 +3,14 @@ import { Geist, Geist_Mono } from "next/font/google";
 import React from "react";
 import AuthGuard from "../components/AuthGuard";
 import Header from "../components/Header";
-import ToasterWrapper from "../components/ToasterWrapper";
+import { AppSidebar } from "../components/sidebar/Sidebar";
+import { Toaster } from 'sonner'
 import "./globals.css";
 import { TooltipProvider } from "../components/ui/tooltip";
+import {
+  SidebarInset,
+  SidebarProvider,
+} from "../components/ui/sidebar"
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -32,11 +37,23 @@ export default function RootLayout({
             <body
                 className={`${geistSans.variable} ${geistMono.variable} antialiased`}
             >
-                <Header />
-                <ToasterWrapper />
-                <AuthGuard>
-                    <TooltipProvider>{children}</TooltipProvider>
-                </AuthGuard>
+                <SidebarProvider
+                    style={
+                        {
+                            "--sidebar-width": "calc(var(--spacing) * 72)",
+                            "--header-height": "calc(var(--spacing) * 12)",
+                        } as React.CSSProperties
+                    }
+                >
+                    <AppSidebar variant="inset" />
+                    <SidebarInset>
+                        <Header />
+                        <Toaster position="top-right" />
+                        <AuthGuard>
+                            <TooltipProvider>{children}</TooltipProvider>
+                        </AuthGuard>
+                    </SidebarInset>
+                </SidebarProvider>
             </body>
         </html>
     );

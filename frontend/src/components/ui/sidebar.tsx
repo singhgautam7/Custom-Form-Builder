@@ -4,26 +4,27 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, VariantProps } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
+import { getAccessToken } from "../../lib/api"
 
-import { useIsMobile } from "@/hooks/use-mobile"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
+import { useIsMobile } from "../../hooks/use-mobile"
+import { cn } from "../../lib/utils"
+import { Button } from "../../components/ui/button"
+import { Input } from "../../components/ui/input"
+import { Separator } from "../../components/ui/separator"
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "../../components/ui/sheet"
+import { Skeleton } from "../../components/ui/skeleton"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "../../components/ui/tooltip"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -260,22 +261,45 @@ function SidebarTrigger({
 }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useSidebar()
 
+  // Determine disabled state only on the client to avoid SSR hydration mismatch.
+  const [disabled, setDisabled] = React.useState<boolean | null>(null)
+  React.useEffect(() => {
+    try {
+      const token = getAccessToken()
+      setDisabled(!token)
+    } catch (e) {
+      setDisabled(true)
+    }
+  }, [])
+
   return (
-    <Button
-      data-sidebar="trigger"
-      data-slot="sidebar-trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("size-7", className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
-      {...props}
-    >
-      <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          data-sidebar="trigger"
+          data-slot="sidebar-trigger"
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "size-7",
+            disabled === null ? "" : disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+            className
+          )}
+          onClick={(event) => {
+            // Prevent toggling the sidebar when the user is not authenticated.
+            if (disabled) return
+            onClick?.(event)
+            toggleSidebar()
+          }}
+          {...(disabled === null ? {} : { 'aria-disabled': disabled })}
+          {...props}
+        >
+          <PanelLeftIcon />
+          <span className="sr-only">Toggle Sidebar</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent sideOffset={6}>Navigation Menu</TooltipContent>
+    </Tooltip>
   )
 }
 

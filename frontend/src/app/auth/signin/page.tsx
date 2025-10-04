@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { login } from '../../../lib/api'
+import { getAccessToken } from '../../../lib/api'
 import { cn } from '../../../lib/utils'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
@@ -21,6 +22,10 @@ import {
 
 export default function SignInPage(){
   const router = useRouter()
+  React.useEffect(()=>{
+    // If already logged in, redirect to home
+    try{ if(typeof window !== 'undefined' && getAccessToken()) router.replace('/') }catch(e){}
+  }, [])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -29,6 +34,7 @@ export default function SignInPage(){
     e.preventDefault(); setLoading(true)
     try{
       await login(email, password)
+      try{ window.dispatchEvent(new Event('auth:changed')) }catch(e){}
       router.push('/')
     }catch(err){
       const message = err instanceof Error ? err.message : String(err)

@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { register } from '../../../lib/api'
+import { getAccessToken } from '../../../lib/api'
 import { cn } from '../../../lib/utils'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
@@ -21,6 +22,9 @@ import {
 
 export default function SignUpPage(){
   const router = useRouter()
+  React.useEffect(()=>{
+    try{ if(typeof window !== 'undefined' && getAccessToken()) router.replace('/') }catch(e){}
+  }, [])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')

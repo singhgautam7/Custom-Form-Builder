@@ -2,6 +2,7 @@
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Form, Question
+from apps.submissions.models import FormSubmission, Answer
 from .serializers import FormSerializer, QuestionSerializer
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -276,6 +277,79 @@ class FormViewSet(viewsets.ModelViewSet):
             setattr(form, k, v)
         form.save()
         return Response(FormSerializer(form).data)
+
+    @action(detail=False, methods=['get'], url_path='my-created')
+    def my_created(self, request):
+        """Return lightweight list of forms created by the authenticated user."""
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        qs = Form.objects.filter(created_by=request.user).order_by('-created_at')
+        data = []
+        for f in qs:
+            data.append({
+                'id': str(f.id),
+                'title': f.title,
+                'description': f.description,
+                'is_active': f.is_active,
+                'is_published': f.is_published,
+                'question_count': f.questions.count(),
+                'submission_count': f.submissions.filter(is_draft=False).count(),
+                'submission_limit': f.submission_limit,
+                'created_at': f.created_at,
+                'slug': f.slug,
+            })
+        return Response({'results': data})
+
+    @action(detail=False, methods=['get'], url_path='my-submitted')
+    def my_submitted(self, request):
+        """Return list of forms the user has submitted (based on submissions.submitted_by).
+
+        This returns one row per submission with form info and submitted_at.
+        """
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        submissions = FormSubmission.objects.filter(submitted_by=request.user, is_draft=False).select_related('form').order_by('-submitted_at')
+        data = []
+        for s in submissions:
+            data.append({
+                'submission_id': str(s.id),
+                'form_id': str(s.form.id),
+                'form_title': s.form.title,
+                'form_description': s.form.description,
+                'question_count': s.form.questions.count(),
+                'submitted_at': s.submitted_at,
+                'slug': s.form.slug,
+            })
+        return Response({'results': data})
+
+    @action(detail=False, methods=['get'], url_path='dashboard-metrics')
+    def dashboard_metrics(self, request):
+        """Return simple metrics for the authenticated user.
+
+        - total_forms_created
+        - total_forms_submitted (forms with at least one completed submission)
+        - total_answers_received (answers across all user's forms)
+        - answers_on_last_form (answers count on the most recently created form)
+        """
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        user_forms = Form.objects.filter(created_by=request.user)
+        total_forms_created = user_forms.count()
+        # forms with at least one completed submission
+        total_forms_submitted = user_forms.filter(submissions__is_draft=False).distinct().count()
+        # total answers across all forms
+        total_answers = Answer.objects.filter(question__form__created_by=request.user).count()
+        # last form answers
+        last_form = user_forms.order_by('-created_at').first()
+        answers_on_last = 0
+        if last_form:
+            answers_on_last = Answer.objects.filter(question__form=last_form).count()
+        return Response({
+            'total_forms_created': total_forms_created,
+            'total_forms_submitted': total_forms_submitted,
+            'total_answers_received': total_answers,
+            'answers_on_last_form': answers_on_last,
+        })
 
 
 class QuestionViewSet(viewsets.ModelViewSet):
