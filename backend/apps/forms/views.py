@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Form, Question
 from apps.submissions.models import FormSubmission, Answer
+from django.db.models import Q
 from .serializers import FormSerializer, QuestionSerializer
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -321,7 +322,12 @@ class FormViewSet(viewsets.ModelViewSet):
         """
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
-        submissions = FormSubmission.objects.filter(submitted_by=request.user, is_draft=False).select_related('form').order_by('-submitted_at')
+        ip = get_client_ip(request)
+        # include submissions submitted by the user, or anonymous submissions from the same IP
+        submissions = FormSubmission.objects.filter(
+            Q(submitted_by=request.user) | Q(submitted_by__isnull=True, ip_address=ip),
+            is_draft=False
+        ).select_related('form').order_by('-submitted_at')
         data = []
         for s in submissions:
             data.append({
@@ -332,6 +338,9 @@ class FormViewSet(viewsets.ModelViewSet):
                 'question_count': s.form.questions.count(),
                 'submitted_at': s.submitted_at,
                 'slug': s.form.slug,
+                # explicit status fields for frontend clarity
+                'is_submitted': not s.is_draft,
+                'status': 'Submitted' if not s.is_draft else 'Draft',
             })
         return Response({'results': data})
 

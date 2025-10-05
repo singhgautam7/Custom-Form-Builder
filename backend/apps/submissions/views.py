@@ -74,6 +74,12 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         payload = request.data.copy()
         payload['form'] = str(form.id)
         payload['ip_address'] = ip
+        # Do NOT inject a string user id into the payload. Instead, pass the
+        # authenticated user instance into serializer.save(...) so the FK is set
+        # correctly regardless of the user PK type.
+        attach_user = None
+        if request.user and request.user.is_authenticated:
+            attach_user = request.user
 
         # Use a DB transaction and lock the Form row to enforce submission_limit safely under concurrency
         with transaction.atomic():
@@ -86,7 +92,10 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
             serializer = self.get_serializer(data=payload)
             serializer.is_valid(raise_exception=True)
-            submission = serializer.save()
+            if attach_user is not None:
+                submission = serializer.save(submitted_by=attach_user)
+            else:
+                submission = serializer.save()
 
             # increment rate limit
             if locked_form.rate_limit_enabled:

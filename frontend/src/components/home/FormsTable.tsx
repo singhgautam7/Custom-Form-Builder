@@ -1,15 +1,7 @@
 ﻿"use client"
 
 import * as React from "react"
-import {
-  IconDownload,
-  IconCircleCheckFilled,
-  IconLoader,
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronsLeft,
-  IconChevronsRight,
-} from "@tabler/icons-react"
+import { IconDownload, IconExternalLink, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs"
 import { Button } from "../ui/button"
 import { Badge } from "../ui/badge"
@@ -32,6 +24,8 @@ import {
 import { fetchWithAuth } from "../../lib/api"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { Dialog, DialogContent, DialogTitle } from "../ui/dialog"
+import { Input } from "../ui/input"
 
 export function FormsTable() {
   const [tab, setTab] = React.useState<'created'|'submitted'>('created')
@@ -48,11 +42,7 @@ export function FormsTable() {
         if (!mounted) return
         // res.results expected
         setRows(res.results || [])
-        // debug logging to help diagnose empty submitted tab
-        try {
-          // eslint-disable-next-line no-console
-          console.debug('FormsTable fetched', { tab, count: (res.results || []).length, sample: (res.results || [])[0] })
-        } catch (e) {}
+        // fetch completed
       })
       .catch((err: any) => {
         console.error('forms fetch error', err)
@@ -66,10 +56,13 @@ export function FormsTable() {
 
   const [pageIndex, setPageIndex] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(10)
+  const [openSubmission, setOpenSubmission] = React.useState<any | null>(null)
+  const [openSubmissionFull, setOpenSubmissionFull] = React.useState<any | null>(null)
 
   const filteredRows = React.useMemo(() => {
     // rows is already fetched per-tab from the API: my-created or my-submitted
-    return tab === 'created' ? rows : rows.filter((r: any) => r.submitted_at)
+    // For submitted tab, show whatever the API returned (don't filter by submitted_at)
+    return tab === 'created' ? rows : rows
   }, [tab, rows])
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize))
@@ -103,7 +96,8 @@ export function FormsTable() {
         'Submission id': r.id || r.submission_id || '',
         'Form name': r.form_title || r.title || '',
         'Description': r.form_description || r.description || '',
-        'Status': r.is_active === false ? 'Disabled' : (r.is_published ? 'Active' : 'Draft'),
+        // treat any row that has a submission id / submitted_at as completed/submitted
+        'Status': (r.submission_id || r.id || r.submitted_at) ? 'Submitted' : (r.is_active === false ? 'Disabled' : (r.is_published ? 'Active' : 'Draft')),
         'Questions': r.question_count ?? '',
         'Submitted': r.submitted_at ?? '',
       }))
@@ -139,17 +133,17 @@ export function FormsTable() {
           {/* Mobile: select view */}
           <Select value={tab} onValueChange={(v) => { setTab(v as 'created'|'submitted'); setPageIndex(0); }}>
             <SelectTrigger size="sm" className="flex w-fit @4xl/main:hidden" id="view-selector">
-              <SelectValue placeholder={tab === 'created' ? 'Created Forms' : 'Submitted forms'} />
+              <SelectValue placeholder={tab === 'created' ? 'My Forms' : 'My Submissions'} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="created">Created Forms</SelectItem>
-              <SelectItem value="submitted">Submitted forms</SelectItem>
+              <SelectItem value="created">My Forms</SelectItem>
+              <SelectItem value="submitted">My Submissions</SelectItem>
             </SelectContent>
           </Select>
 
           <TabsList className="hidden @4xl/main:flex">
-            <TabsTrigger value="created">Created Forms</TabsTrigger>
-            <TabsTrigger value="submitted">Submitted forms</TabsTrigger>
+            <TabsTrigger value="created">My Forms</TabsTrigger>
+            <TabsTrigger value="submitted">My Submissions</TabsTrigger>
           </TabsList>
 
           <div className="flex items-center gap-2">
@@ -168,10 +162,11 @@ export function FormsTable() {
                   <TableHead className="min-w-[140px]">Form name</TableHead>
                   <TableHead className="w-full max-w-[60%]">Description</TableHead>
                   <TableHead className="hidden md:table-cell">Status</TableHead>
-                  <TableHead className="hidden lg:table-cell text-right">Questions</TableHead>
-                  <TableHead className="hidden lg:table-cell text-right">Submissions</TableHead>
-                  <TableHead className="hidden xl:table-cell text-right">Limit</TableHead>
-                  <TableHead className="text-right hidden md:table-cell">Created</TableHead>
+                  <TableHead className="hidden md:table-cell text-right">Questions</TableHead>
+                  <TableHead className="hidden md:table-cell text-right">Submissions</TableHead>
+                  <TableHead className="hidden lg:table-cell text-right">Limit</TableHead>
+                  <TableHead className="text-right md:table-cell">Created</TableHead>
+                  <TableHead className="w-12 text-right">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -197,10 +192,17 @@ export function FormsTable() {
                         )}
                       </Badge>
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell text-right">{row.question_count ?? ''}</TableCell>
-                    <TableCell className="hidden lg:table-cell text-right">{row.submission_count ?? ''}</TableCell>
-                    <TableCell className="hidden xl:table-cell text-right">{row.submission_limit ?? ''}</TableCell>
-                    <TableCell className="hidden md:table-cell text-right">{row.created_at ? format(new Date(row.created_at), 'PP p') : ''}</TableCell>
+                    <TableCell className="hidden md:table-cell text-right">{row.question_count ?? ''}</TableCell>
+                    <TableCell className="hidden md:table-cell text-right">{row.submission_count ?? ''}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-right">{row.submission_limit ?? ''}</TableCell>
+                    <TableCell className="text-right md:table-cell">{row.created_at ? format(new Date(row.created_at), 'PP p') : ''}</TableCell>
+                    <TableCell className="w-12 text-right">
+                      <a href={`/forms/view/${row.id || row.slug || row.uuid || row.pk || ''}`} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="icon" aria-label="Open">
+                            <IconExternalLink />
+                          </Button>
+                        </a>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -246,14 +248,36 @@ export function FormsTable() {
             </div>
           </div>
         </TabsContent>
+        {/* Dialog to show answers for a selected submission in My Submissions tab */}
+        <Dialog open={!!openSubmission} onOpenChange={(v) => { if (!v) { setOpenSubmission(null); setOpenSubmissionFull(null) } }}>
+          <DialogContent className="w-[85vw] h-[85vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <DialogTitle>{((openSubmissionFull || openSubmission) && ((openSubmissionFull || openSubmission).submitted_by_email || (openSubmissionFull || openSubmission).submitted_by_name || (openSubmissionFull || openSubmission).submitted_by || 'Submission')) + ' submission'}</DialogTitle>
+            </div>
 
-        {/* Debugging: show raw API payload for submitted tab to help identify why rows might be empty */}
-        {tab === 'submitted' && (
-          <div className="mt-4 px-4">
-            <div className="text-sm text-muted-foreground mb-2">Debug: raw my-submitted API results</div>
-            <pre className="max-h-64 overflow-auto rounded bg-muted/10 p-2 text-xs">{JSON.stringify(rows, null, 2)}</pre>
-          </div>
-        )}
+            <div className="space-y-6">
+              {((openSubmissionFull?.answers || openSubmission?.answers) || []).map((a: any, i: number) => (
+                <div key={i} className="border rounded p-3">
+                  <div className="text-sm text-muted-foreground mb-1">Question</div>
+                  <div className="mb-2">{a.question_text || a.question || ''}</div>
+                  <div className="text-sm text-muted-foreground mb-1">Answer</div>
+                  <div>
+                    {a.answer_text && <Input value={a.answer_text} readOnly className="cursor-default" />}
+                    {a.answer_number !== undefined && a.answer_number !== null && <Input value={String(a.answer_number)} readOnly className="cursor-default" />}
+                    {a.answer_date && <Input value={a.answer_date} readOnly className="cursor-default" />}
+                    {a.answer_choices && Array.isArray(a.answer_choices) && (
+                      <div className="flex flex-col gap-2 mt-2">
+                        {a.answer_choices.map((c: any, idx: number) => (
+                          <Input key={idx} value={String((c && (c.label || c)) || c)} readOnly className="cursor-default" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <TabsContent value="submitted">
           <div className="overflow-hidden rounded-lg border">
@@ -263,8 +287,9 @@ export function FormsTable() {
                   <TableHead className="min-w-[140px]">Form name</TableHead>
                   <TableHead className="w-full max-w-[60%]">Description</TableHead>
                   <TableHead className="hidden md:table-cell">Status</TableHead>
-                  <TableHead className="hidden lg:table-cell text-right">Questions</TableHead>
+                  <TableHead className="hidden md:table-cell text-right">Questions</TableHead>
                   <TableHead className="text-right hidden md:table-cell">Submitted</TableHead>
+                  <TableHead className="w-12 text-right">Open</TableHead>
                 </TableRow>
               </TableHeader>
               {filteredRows.length === 0 ? (
@@ -285,7 +310,9 @@ export function FormsTable() {
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         <Badge variant="outline" className="text-muted-foreground px-1.5">
-                          {row.is_active === false ? (
+                          {row.is_submitted ? (
+                            <span className="text-green-400">{row.status || 'Submitted'}</span>
+                          ) : row.is_active === false ? (
                             <span className="text-yellow-400">Disabled</span>
                           ) : row.is_published ? (
                             <span className="text-green-400">Active</span>
@@ -294,8 +321,26 @@ export function FormsTable() {
                           )}
                         </Badge>
                       </TableCell>
-                      <TableCell className="hidden lg:table-cell text-right">{row.question_count ?? ''}</TableCell>
+                      <TableCell className="hidden md:table-cell text-right">{row.question_count ?? ''}</TableCell>
                       <TableCell className="text-right hidden md:table-cell">{row.submitted_at ? format(new Date(row.submitted_at), 'PP p') : ''}</TableCell>
+                      <TableCell className="w-12 text-right">
+                        <Button variant="outline" size="icon" aria-label="Open submission" onClick={async () => {
+                          setOpenSubmission(row)
+                          // fetch full submission details
+                          try {
+                            const sid = row.submission_id || row.id
+                            const formId = row.form_id || row.form_id || row.form_id || row.form_id
+                            // the retrieve endpoint is under /api/forms/{form_slug_or_id}/submissions/{id}/
+                            const full = await fetchWithAuth(`/api/forms/${row.slug || row.form_id || row.form_id}/submissions/${sid}/`)
+                            setOpenSubmissionFull(full)
+                          } catch (e) {
+                            // fallback: open row as-is
+                            setOpenSubmissionFull(row)
+                          }
+                        }}>
+                          <IconExternalLink />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

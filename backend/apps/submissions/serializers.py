@@ -35,10 +35,15 @@ class AnswerSerializer(serializers.ModelSerializer):
 
 class SubmissionSerializer(serializers.ModelSerializer):
     answers = AnswerSerializer(many=True)
+    submitted_by_email = serializers.SerializerMethodField()
+    submitted_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = FormSubmission
-        fields = ('id', 'form', 'submitted_by', 'submitted_at', 'ip_address', 'is_draft', 'completed_at', 'last_saved_at', 'answers')
+        fields = (
+            'id', 'form', 'submitted_by', 'submitted_at', 'ip_address', 'is_draft',
+            'completed_at', 'last_saved_at', 'answers', 'submitted_by_email', 'submitted_by_name'
+        )
         read_only_fields = ('id', 'submitted_at', 'last_saved_at', 'completed_at')
 
     def create(self, validated_data):
@@ -47,3 +52,25 @@ class SubmissionSerializer(serializers.ModelSerializer):
         for a in answers:
             Answer.objects.create(submission=submission, question_id=a['question'], answer_text=a.get('answer_text'), answer_number=a.get('answer_number'), answer_date=a.get('answer_date'), answer_choices=a.get('answer_choices'))
         return submission
+
+    def get_submitted_by_email(self, obj):
+        # submitted_by is a FK to user; return email when available
+        user = obj.submitted_by
+        if user is None:
+            return None
+        # Some user models may not have 'email' — guard access
+        return getattr(user, 'email', None) or None
+
+    def get_submitted_by_name(self, obj):
+        user = obj.submitted_by
+        if user is None:
+            return None
+        # Try full name fields then username
+        name = None
+        if getattr(user, 'get_full_name', None):
+            try:
+                name = user.get_full_name()
+            except Exception:
+                name = None
+        name = name or getattr(user, 'full_name', None) or getattr(user, 'display_name', None) or getattr(user, 'username', None) or None
+        return name

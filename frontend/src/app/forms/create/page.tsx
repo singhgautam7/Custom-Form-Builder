@@ -8,7 +8,7 @@ import { Button } from "../../../components/ui/button"
 import { IconMail, IconHash, IconCalendar, IconAlignLeft, IconCircle, IconCheckbox, IconSelector, IconList, IconFileText } from "@tabler/icons-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "../../../components/ui/tooltip"
 import { Checkbox } from "../../../components/ui/checkbox"
-import { IconPlus, IconTrash, IconHammer, IconGripVertical, IconX } from "@tabler/icons-react"
+import { IconPlus, IconTrash, IconGripVertical, IconX } from "@tabler/icons-react"
 import {
   closestCenter,
   DndContext,
@@ -28,14 +28,18 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Table as _UnusedTable } from "../../../components/ui/table"
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "../../../components/ui/table"
 import {
   Item,
-  ItemActions,
   ItemContent,
-  ItemDescription,
   ItemMedia,
-  ItemTitle,
 } from "../../../components/ui/item"
 import { Popover, PopoverTrigger, PopoverContent } from "../../../components/ui/popover"
 import { ChevronDownIcon } from "lucide-react"
@@ -46,8 +50,9 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Spinner } from '../../../components/ui/spinner'
 import { Calendar } from "../../../components/ui/calendar"
+// format imported earlier is unused in this file after removals
 
-const FIELD_TYPES: Array<{ key: string; label: string; icon: any }> = [
+const FIELD_TYPES: Array<{ key: string; label: string; icon: React.ComponentType<any> }> = [
   { key: 'text', label: 'Text', icon: IconFileText },
   { key: 'email', label: 'Email', icon: IconMail },
   { key: 'number', label: 'Number', icon: IconHash },
@@ -63,10 +68,9 @@ export default function CreateFormPage() {
   const router = useRouter()
   const [title, setTitle] = React.useState('')
   const [description, setDescription] = React.useState('')
+  // Start with a single empty question so the UI shows one question slot
   const [questions, setQuestions] = React.useState<QuestionRow[]>([
-    { id: 1, type: 'text', label: 'What is your name?', required: true },
-    { id: 2, type: 'radio', label: 'How satisfied are you?', required: true, options: ['Yes', 'No'] },
-    { id: 3, type: 'checkbox', label: 'Which features do you use?', required: false, options: ['A', 'B'] },
+    { id: String(1), type: 'text', label: '', required: true },
   ])
   const canSubmit = React.useMemo(() => {
     return title.trim().length > 0 && questions.length > 0
@@ -106,7 +110,7 @@ export default function CreateFormPage() {
   }
 
   function mapQuestionForAPI(q: QuestionRow, idx: number) {
-    const base: any = {
+    const base: Record<string, unknown> = {
       question_text: q.label,
       question_type: q.type,
       is_required: !!q.required,
@@ -172,14 +176,14 @@ export default function CreateFormPage() {
 
   function addQuestionOfType(type: string) {
     // start with an empty label so the Input's placeholder "Question" is visible
-    const base: QuestionRow = { id: Date.now(), type, label: '', required: false }
+  const base: QuestionRow = { id: String(Date.now()), type, label: '', required: false }
     if (type === 'radio' || type === 'checkbox' || type === 'dropdown' || type === 'multiselect') {
       // default one option
-      // @ts-ignore
-      base.options = ['']
+      ;(base as any).options = ['']
     }
-    setQuestions((q) => [...q, base])
+    setQuestions((q) => [...q, base as QuestionRow])
   }
+
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-2 min-h-screen p-8 sm:p-12">
@@ -212,7 +216,7 @@ export default function CreateFormPage() {
           </div>
         </div>
 
-        {/* Right side: narrower (3/12) containing toolbar and question-type buttons */}
+        {/* Right side: narrower (3/12) showing submissions for this form (when available) */}
         <div className="lg:col-span-3">
             <div className="flex justify-end mb-4 gap-3">
               <Button variant="outline" size="sm" disabled={!canSubmit || isSaving}>
@@ -225,29 +229,21 @@ export default function CreateFormPage() {
                 {isSaving ? <><Spinner className="h-4 w-4 mr-2" /> Publishing...</> : 'Publish Form'}
               </Button>
             </div>
+
           <div className="flex flex-col gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Add Questions</CardTitle>
-                <CardDescription>Select a question type to add in your form.</CardDescription>
+                <CardTitle>Add questions</CardTitle>
+                <CardDescription>Quickly add common question types to your form.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 gap-2">
-                  {FIELD_TYPES.map((f) => {
-                    const Icon = f.icon
-                    return (
-                      <button
-                        key={f.key}
-                        type="button"
-                        aria-label={`Add ${f.label} question`}
-                        onClick={() => addQuestionOfType(f.key)}
-                        className="flex items-center gap-3 rounded-md border border-border px-3 py-3 text-sm text-left cursor-pointer"
-                      >
-                        <Icon className="size-4 text-accent-foreground" />
-                        <span>{f.label}</span>
-                      </button>
-                    )
-                  })}
+                <div className="flex flex-col gap-2">
+                  {FIELD_TYPES.map((t) => (
+                    <Button key={t.key} variant="ghost" className="justify-between" onClick={() => addQuestionOfType(t.key)}>
+                      <div className="flex items-center gap-2"><t.icon className="size-4" /> <span>{t.label}</span></div>
+                      <IconPlus className="size-4 text-muted-foreground" />
+                    </Button>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -259,8 +255,8 @@ export default function CreateFormPage() {
   )
 }
 
-type QuestionRow = {
-  id: number
+  type QuestionRow = {
+  id: string
   type: string
   label: string
   required: boolean
@@ -274,11 +270,41 @@ type QuestionRow = {
   options?: string[]
 }
 
+// ...existing code...
+
+function LabelEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const inputRef = React.useRef<HTMLInputElement | null>(null)
+
+  // When parent value changes externally, update the uncontrolled input only if not focused
+  React.useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    if (document.activeElement !== el) {
+      el.value = value || ''
+    }
+  }, [value])
+
+  function commit() {
+    const el = inputRef.current
+    if (!el) return
+    const next = el.value
+    if (next !== value) onChange(next)
+  }
+
+  function onKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur()
+    }
+  }
+
+  return <Input placeholder="Question" defaultValue={value} ref={inputRef} onBlur={commit} onKeyDown={onKey} />
+}
+
 function QuestionsTable({ questions, setQuestions }: { questions: QuestionRow[]; setQuestions: React.Dispatch<React.SetStateAction<QuestionRow[]>> }) {
   // Simple sortable rendering (client-side)
   const [sortKey, setSortKey] = React.useState<keyof QuestionRow | null>(null)
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc' | null>(null)
-  const [draggingId, setDraggingId] = React.useState<number | null>(null)
+  const [draggingId, setDraggingId] = React.useState<string | null>(null)
 
   const sorted = React.useMemo(() => {
     const copy = [...questions]
@@ -343,21 +369,28 @@ function QuestionsTable({ questions, setQuestions }: { questions: QuestionRow[];
     useSensor(KeyboardSensor, {})
   )
 
-  const dataIds = React.useMemo<UniqueIdentifier[]>(() => questions.map((q) => q.id), [questions])
+  const dataIds = React.useMemo<UniqueIdentifier[]>(() => sorted.map((q) => String(q.id)), [sorted])
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (active && over && active.id !== over.id) {
       setQuestions((prev) => {
-        const oldIndex = prev.findIndex((p) => p.id === (active.id as number))
-        const newIndex = prev.findIndex((p) => p.id === (over.id as number))
+        const activeId = String(active.id)
+        const overId = String(over.id)
+        const oldIndex = prev.findIndex((p) => p.id === activeId)
+        const newIndex = prev.findIndex((p) => p.id === overId)
         if (oldIndex === -1 || newIndex === -1) return prev
         return arrayMove(prev, oldIndex, newIndex)
       })
     }
   }
 
-  function DragHandle({ attributes, listeners }: { attributes: any; listeners: any }) {
+  // helper to update one question field without recreating unrelated objects
+  function setQuestionField(id: string, patch: Partial<QuestionRow>) {
+    setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, ...patch } : q)))
+  }
+
+    function DragHandle({ attributes, listeners }: { attributes: any; listeners: any }) {
     return (
       <Button {...attributes} {...listeners} variant="ghost" size="icon" className="text-muted-foreground size-7 hover:bg-transparent">
         <IconGripVertical className="text-muted-foreground size-3" />
@@ -367,7 +400,7 @@ function QuestionsTable({ questions, setQuestions }: { questions: QuestionRow[];
   }
 
   function DraggableRow({ row }: { row: QuestionRow }) {
-    const { transform, transition, setNodeRef, isDragging, attributes, listeners } = useSortable({ id: row.id })
+    const { transform, transition, setNodeRef, isDragging, attributes, listeners } = useSortable({ id: String(row.id) })
 
     return (
       <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`relative z-0 ${isDragging ? 'z-10 opacity-80' : ''}`}>
@@ -381,9 +414,9 @@ function QuestionsTable({ questions, setQuestions }: { questions: QuestionRow[];
           <ItemContent>
             <div className="flex flex-col gap-2">
               <div className="flex items-start gap-3">
-                <div className="flex-1">
+                  <div className="flex-1">
                   <div className="text-xs text-muted-foreground mb-1">{(FIELD_TYPES.find(f => f.key === row.type)?.label) ?? row.type}</div>
-                  <Input placeholder="Question" value={row.label} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuestions((d) => d.map((r) => (r.id === row.id ? { ...r, label: e.target.value } : r)))} />
+                  <LabelEditor value={row.label} onChange={(val) => setQuestions((d) => d.map((r) => (r.id === row.id ? { ...r, label: val } : r)))} />
                 </div>
               </div>
 
@@ -453,8 +486,8 @@ function QuestionsTable({ questions, setQuestions }: { questions: QuestionRow[];
                   {(row.type === 'radio' || row.type === 'checkbox' || row.type === 'dropdown' || row.type === 'multiselect') && (
                     <div className="flex flex-col gap-2 w-full max-w-md">
                       {(row.options || []).map((opt, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <Input placeholder={`Option ${i + 1}`} value={opt} onChange={(e) => setQuestions((d) => d.map((r) => (r.id === row.id ? { ...r, options: (r.options || []).map((o, idx) => idx === i ? e.target.value : o) } : r)))} />
+                        <div key={`${row.id}-${i}`} className="flex items-center gap-2">
+                          <Input placeholder={`Option ${i + 1}`} value={opt} onChange={(e) => setQuestions((d) => d.map((r) => r.id === row.id ? { ...r, options: (r.options || []).map((o, idx) => idx === i ? e.target.value : o) } : r))} />
                           <Button variant="ghost" size="icon" onClick={() => setQuestions((d) => d.map((r) => r.id === row.id ? { ...r, options: (r.options || []).filter((_, idx) => idx !== i) } : r))}>
                             <IconX className="size-4" />
                           </Button>
@@ -518,7 +551,7 @@ function QuestionsTable({ questions, setQuestions }: { questions: QuestionRow[];
             {sorted.length ? (
               <SortableContext items={dataIds} strategy={verticalListSortingStrategy}>
                 {sorted.map((row) => (
-                  <DraggableRow key={row.id} row={row} />
+                  <DraggableRow key={String(row.id)} row={row} />
                 ))}
               </SortableContext>
             ) : (
