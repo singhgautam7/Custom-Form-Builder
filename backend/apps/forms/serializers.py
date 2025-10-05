@@ -1,6 +1,8 @@
 ﻿from rest_framework import serializers
 from .models import Form, Question
 from django.utils import timezone
+from django.utils.text import slugify
+import uuid
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -38,7 +40,8 @@ class FormSerializer(serializers.ModelSerializer):
                   'created_at', 'updated_at', 'slug', 'expires_at', 'is_password_protected', 'access_code',
                   'enable_email_notifications', 'notification_emails', 'rate_limit_enabled', 'rate_limit_count',
                   'rate_limit_period', 'allow_partial_saves', 'questions')
-        read_only_fields = ('id', 'created_by', 'created_at', 'updated_at')
+        # slug is generated server-side; make it read-only so clients don't need to supply it
+        read_only_fields = ('id', 'created_by', 'created_at', 'updated_at', 'slug')
 
     def validate(self, data):
         # slug uniqueness handled by model
@@ -49,6 +52,15 @@ class FormSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         user = request.user
         validated_data['created_by'] = user
+        # Ensure a slug exists; if not provided, generate one from title and make it unique
+        if not validated_data.get('slug'):
+            base = slugify(validated_data.get('title', 'form')) or 'form'
+            candidate = base
+            # append short uuid suffix on collisions
+            while Form.objects.filter(slug=candidate).exists():
+                candidate = f"{base}-{uuid.uuid4().hex[:6]}"
+            validated_data['slug'] = candidate
+
         form = Form.objects.create(**validated_data)
         for q in questions_data:
             Question.objects.create(form=form, **q)

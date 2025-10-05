@@ -12,6 +12,19 @@ import csv
 import io
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
+import uuid
+
+
+def resolve_form_lookup(lookup: str):
+    """Resolve a Form either by slug or UUID-like id."""
+    try:
+        return Form.objects.get(slug=lookup)
+    except Form.DoesNotExist:
+        try:
+            uuid_val = uuid.UUID(str(lookup))
+            return Form.objects.get(id=uuid_val)
+        except Exception:
+            return get_object_or_404(Form, slug=lookup)
 
 
 class IsOwner(permissions.BasePermission):
@@ -41,7 +54,7 @@ class FormViewSet(viewsets.ModelViewSet):
         serializer.save(created_by=self.request.user)
 
     def retrieve(self, request, slug=None):
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         # check expiry
         if form.is_expired():
             return Response({'detail': 'Form expired.'}, status=status.HTTP_410_GONE)
@@ -58,7 +71,7 @@ class FormViewSet(viewsets.ModelViewSet):
 
         The schema includes question id, type, label, required, options, help_text, hint, and constraints.
         """
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         schema = {'id': str(form.id), 'title': form.title, 'description': form.description, 'questions': []}
         for q in form.questions.all():
             qschema = {
@@ -88,7 +101,7 @@ class FormViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def duplicate(self, request, slug=None):
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         # require authenticated
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -107,7 +120,7 @@ class FormViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='publish')
     def publish(self, request, slug=None):
         """Publish a form (owner-only)."""
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         if form.created_by != request.user:
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
         form.is_published = True
@@ -117,7 +130,7 @@ class FormViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='unpublish')
     def unpublish(self, request, slug=None):
         """Unpublish a form (owner-only)."""
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         if form.created_by != request.user:
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
         form.is_published = False
@@ -126,7 +139,7 @@ class FormViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def verify_access(self, request, slug=None):
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         if not form.is_password_protected:
             return Response({'detail': 'Form is not password protected.'}, status=status.HTTP_400_BAD_REQUEST)
         code = request.data.get('code')
@@ -136,7 +149,7 @@ class FormViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def check_access(self, request, slug=None):
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         data = {'is_expired': form.is_expired(), 'rate_limited': False}
         # basic rate limit check placeholder
         ip = get_client_ip(request)
@@ -146,7 +159,7 @@ class FormViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='ratelimit/status')
     def ratelimit_status(self, request, slug=None):
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         ip = request.query_params.get('ip') or get_client_ip(request)
         from apps.ratelimit.models import SubmissionRateLimit
         try:
@@ -158,7 +171,7 @@ class FormViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='submissions/report')
     def submissions_report(self, request, slug=None):
         """Return paginated submissions for a form (owner-only)."""
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         if form.created_by != request.user:
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
         qs = form.submissions.filter(is_draft=False).order_by('-submitted_at')
@@ -183,7 +196,7 @@ class FormViewSet(viewsets.ModelViewSet):
         - avg_completion_seconds: average time from creation -> completed (if available)
         - question_stats: per-question simple stats (counts, choice distribution where applicable)
         """
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         if form.created_by != request.user:
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -230,7 +243,7 @@ class FormViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='submissions/export')
     def submissions_export(self, request, slug=None):
         """Stream CSV export of submissions (owner-only)."""
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         if form.created_by != request.user:
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
         qs = form.submissions.filter(is_draft=False).order_by('submitted_at')
@@ -253,7 +266,7 @@ class FormViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='ratelimit/reset')
     def ratelimit_reset(self, request, slug=None):
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         # owner-only
         if form.created_by != request.user:
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
@@ -267,7 +280,7 @@ class FormViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['patch'], url_path='settings')
     def update_settings(self, request, slug=None):
-        form = get_object_or_404(Form, slug=slug)
+        form = resolve_form_lookup(slug)
         if form.created_by != request.user:
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
         allowed = ['is_active', 'allow_multiple_submissions', 'expires_at', 'rate_limit_enabled', 'rate_limit_count', 'rate_limit_period', 'is_password_protected', 'access_code', 'is_published', 'submission_limit']
@@ -337,18 +350,19 @@ class FormViewSet(viewsets.ModelViewSet):
         total_forms_created = user_forms.count()
         # forms with at least one completed submission
         total_forms_submitted = user_forms.filter(submissions__is_draft=False).distinct().count()
-        # total answers across all forms
-        total_answers = Answer.objects.filter(question__form__created_by=request.user).count()
-        # last form answers
+        # total submissions across all user's forms (completed submissions)
+        total_submissions = FormSubmission.objects.filter(form__created_by=request.user, is_draft=False).count()
+        # submissions on the most recently created form
         last_form = user_forms.order_by('-created_at').first()
-        answers_on_last = 0
+        submissions_on_last = 0
         if last_form:
-            answers_on_last = Answer.objects.filter(question__form=last_form).count()
+            submissions_on_last = last_form.submissions.filter(is_draft=False).count()
         return Response({
             'total_forms_created': total_forms_created,
             'total_forms_submitted': total_forms_submitted,
-            'total_answers_received': total_answers,
-            'answers_on_last_form': answers_on_last,
+            # keep same response keys for the frontend but report submission counts
+            'total_answers_received': total_submissions,
+            'answers_on_last_form': submissions_on_last,
         })
 
 

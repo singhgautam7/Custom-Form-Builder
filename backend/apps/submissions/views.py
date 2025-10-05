@@ -18,6 +18,22 @@ from apps.notifications.models import FormNotificationLog
 from .serializers import SubmissionSerializer
 from apps.notifications.tasks import dispatch_notification
 
+import uuid
+from django.shortcuts import get_object_or_404
+
+
+def resolve_form_lookup(lookup: str):
+    """Resolve a Form either by slug or UUID-like id (local helper to avoid circular imports)."""
+    try:
+        # try slug first
+        return Form.objects.get(slug=lookup)
+    except Form.DoesNotExist:
+        try:
+            uuid_val = uuid.UUID(str(lookup))
+            return Form.objects.get(id=uuid_val)
+        except Exception:
+            return get_object_or_404(Form, slug=lookup)
+
 
 @extend_schema(
     parameters=[
@@ -32,11 +48,11 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         form_slug = self.kwargs.get('form_slug')
-        form = get_object_or_404(Form, slug=form_slug)
+        form = resolve_form_lookup(form_slug)
         return FormSubmission.objects.filter(form=form)
 
     def create(self, request, form_slug=None):
-        form = get_object_or_404(Form, slug=form_slug)
+        form = resolve_form_lookup(form_slug)
         # expiry and active checks
         if form.is_expired() or not form.is_active:
             return Response({'detail': 'Form not accepting submissions.'}, status=status.HTTP_410_GONE)

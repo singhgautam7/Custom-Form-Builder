@@ -5,12 +5,12 @@ import { Sun, Moon } from 'lucide-react'
 import { IconHome, IconPlus } from '@tabler/icons-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
 import { Button } from './ui/button'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { getAccessToken } from '../lib/api'
 import { cn } from '../lib/utils'
 import { SidebarTrigger, useSidebar } from './ui/sidebar'
 
-const ThemeToggle = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(function ThemeToggle(props, ref){
+export const ThemeToggle = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(function ThemeToggle(props, ref){
   // avoid reading localStorage during render to prevent SSR/client hydration mismatch
   const [theme, setTheme] = useState<'light'|'dark'>('light')
   const [mounted, setMounted] = useState(false)
@@ -44,9 +44,11 @@ const ThemeToggle = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttribut
   )
 })
 
-export default function Header(){
+export default function Header({ hideActions }: { hideActions?: boolean }){
   const router = useRouter()
   const [authenticated, setAuthenticated] = React.useState(false)
+  const pathname = usePathname()
+  const autoHide = hideActions ?? (typeof pathname === 'string' && pathname.startsWith('/form/submit/'))
 
   React.useEffect(()=>{
     function check(){
@@ -75,15 +77,15 @@ export default function Header(){
   return (
     <header className="w-full border-b px-4 py-2 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        {authenticated && <SidebarTrigger />}
-        {authenticated && (
-          <Button variant="outline" size="sm" onClick={() => router.push('/forms/create')}><IconHome />Home</Button>
+    {!autoHide && authenticated && <SidebarTrigger />}
+  {!autoHide && authenticated && (
+          <Button variant="outline" size="sm" className="cursor-pointer" onClick={() => router.push('/')}><IconHome />Home</Button>
         )}
       </div>
       <div className="flex items-center gap-3">
-        {authenticated && (
-            <Button variant="default" size="sm" onClick={() => router.push('/forms/create')}>< IconPlus />Create a Form</Button>
-        )}
+    {!autoHide && authenticated && (
+      <Button variant="default" size="sm" className="cursor-pointer" onClick={() => router.push('/forms/create')}>< IconPlus />Create a Form</Button>
+    )}
         <div className="w-px h-6 bg-border" />
         <Tooltip>
           <TooltipTrigger asChild>

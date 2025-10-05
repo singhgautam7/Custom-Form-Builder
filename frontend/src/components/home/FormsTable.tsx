@@ -48,6 +48,11 @@ export function FormsTable() {
         if (!mounted) return
         // res.results expected
         setRows(res.results || [])
+        // debug logging to help diagnose empty submitted tab
+        try {
+          // eslint-disable-next-line no-console
+          console.debug('FormsTable fetched', { tab, count: (res.results || []).length, sample: (res.results || [])[0] })
+        } catch (e) {}
       })
       .catch((err: any) => {
         console.error('forms fetch error', err)
@@ -242,6 +247,14 @@ export function FormsTable() {
           </div>
         </TabsContent>
 
+        {/* Debugging: show raw API payload for submitted tab to help identify why rows might be empty */}
+        {tab === 'submitted' && (
+          <div className="mt-4 px-4">
+            <div className="text-sm text-muted-foreground mb-2">Debug: raw my-submitted API results</div>
+            <pre className="max-h-64 overflow-auto rounded bg-muted/10 p-2 text-xs">{JSON.stringify(rows, null, 2)}</pre>
+          </div>
+        )}
+
         <TabsContent value="submitted">
           <div className="overflow-hidden rounded-lg border">
             <Table>
@@ -254,31 +267,39 @@ export function FormsTable() {
                   <TableHead className="text-right hidden md:table-cell">Submitted</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {rows.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize).map((row: any) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium max-w-[160px]">{row.form_title || row.title}</TableCell>
-                    <TableCell className="w-full">
-                      <div title={row.form_description || row.description} className="truncate max-w-full">
-                        {row.form_description || row.description}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Badge variant="outline" className="text-muted-foreground px-1.5">
-                        {row.is_active === false ? (
-                          <span className="text-yellow-400">Disabled</span>
-                        ) : row.is_published ? (
-                          <span className="text-green-400">Active</span>
-                        ) : (
-                          <span className="text-muted-foreground">Draft</span>
-                        )}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell text-right">{row.question_count ?? ''}</TableCell>
-                    <TableCell className="text-right hidden md:table-cell">{row.submitted_at ? format(new Date(row.submitted_at), 'PP p') : ''}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
+              {filteredRows.length === 0 ? (
+                <tbody>
+                  <tr>
+                    <td colSpan={5} className="p-6 text-center text-muted-foreground">No submissions found.</td>
+                  </tr>
+                </tbody>
+              ) : (
+                <TableBody>
+                  {filteredRows.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize).map((row: any) => (
+                    <TableRow key={row.submission_id || row.id}>
+                      <TableCell className="font-medium max-w-[160px]">{row.form_title || row.title}</TableCell>
+                      <TableCell className="w-full">
+                        <div title={row.form_description || row.description} className="truncate max-w-full">
+                          {row.form_description || row.description}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <Badge variant="outline" className="text-muted-foreground px-1.5">
+                          {row.is_active === false ? (
+                            <span className="text-yellow-400">Disabled</span>
+                          ) : row.is_published ? (
+                            <span className="text-green-400">Active</span>
+                          ) : (
+                            <span className="text-muted-foreground">Draft</span>
+                          )}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-right">{row.question_count ?? ''}</TableCell>
+                      <TableCell className="text-right hidden md:table-cell">{row.submitted_at ? format(new Date(row.submitted_at), 'PP p') : ''}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              )}
             </Table>
           </div>
         </TabsContent>
