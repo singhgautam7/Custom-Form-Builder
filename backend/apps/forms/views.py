@@ -63,6 +63,16 @@ class FormViewSet(viewsets.ModelViewSet):
         if not form.is_published and form.created_by != request.user:
             return Response({'detail': 'Form not published.'}, status=status.HTTP_404_NOT_FOUND)
         # password protection handled via verify-access endpoint
+
+        # Track active views for non-owners
+        if form.created_by != request.user:
+            from apps.analytics.models import FormViewEvent
+            FormViewEvent.objects.create(
+                form=form,
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')[:255]
+            )
+
         serializer = self.get_serializer(form)
         return Response(serializer.data)
 

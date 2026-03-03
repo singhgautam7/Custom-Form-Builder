@@ -61,7 +61,8 @@ class TokenSerializer(serializers.Serializer):
 class CurrentUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'is_active')
+        fields = ('id', 'username', 'email', 'is_active', 'first_name', 'last_name')
+        read_only_fields = ('id', 'username', 'email', 'is_active')
 
 
 class EmailSerializer(serializers.Serializer):

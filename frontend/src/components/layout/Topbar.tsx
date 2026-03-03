@@ -3,6 +3,9 @@
 import * as React from "react"
 import { Search, Sun, Moon, LogOut } from "lucide-react"
 import { useTheme } from "next-themes"
+import { usePathname } from "next/navigation"
+import Link from "next/link"
+import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
@@ -10,14 +13,34 @@ import { cn } from "@/lib/utils"
 export function Topbar({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
+  const pathname = usePathname()
+  const { user, getInitials } = useAuth()
 
   React.useEffect(() => {
     setMounted(true)
   }, [])
 
+  const generateBreadcrumb = () => {
+    if (pathname === '/') return 'Overview'
+    if (pathname === '/forms') return 'All Forms'
+    if (pathname?.startsWith('/forms/')) return 'Form Details'
+    if (pathname === '/submissions') return 'Submissions'
+    if (pathname === '/settings') return 'Settings'
+    if (pathname === '/settings/profile') return 'Profile Settings'
+    return ''
+  }
+
+  const breadcrumb = generateBreadcrumb()
+
   return (
     <header className={cn("sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-border/50 bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60", className)}>
       <div className="flex flex-1 items-center gap-4">
+        {breadcrumb && (
+          <div className="hidden sm:flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <span>{breadcrumb}</span>
+            <div className="h-4 w-px bg-border/50" />
+          </div>
+        )}
         <Button variant="outline" className="relative h-8 w-full justify-start rounded-[0.5rem] bg-muted/50 text-sm font-normal text-muted-foreground shadow-none sm:pr-12 md:w-64 lg:w-80 border-border/50">
           <Search className="mr-2 h-4 w-4" />
           <span className="hidden lg:inline-flex">Search forms or commands...</span>
@@ -42,11 +65,16 @@ export function Topbar({ className }: { className?: string }) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full ml-2 bg-gradient-to-tr from-primary/30 to-primary/10 border border-border/60">
-               <span className="font-semibold text-xs tracking-wider">JD</span>
+               <span className="font-semibold text-xs tracking-wider">{getInitials() || '...'}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 mt-1">
-            <DropdownMenuItem className="cursor-pointer">Profile settings</DropdownMenuItem>
+            <div className="px-2 py-1.5 text-sm font-medium border-b border-border/50 mb-1">
+              <span className="truncate block opacity-80">{user?.email || 'Loading...'}</span>
+            </div>
+            <DropdownMenuItem asChild className="cursor-pointer">
+              <Link href="/settings/profile">Profile settings</Link>
+            </DropdownMenuItem>
             <DropdownMenuItem className="cursor-pointer">Billing</DropdownMenuItem>
             <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10 mt-1">
               <LogOut className="w-4 h-4 mr-2" /> Log out

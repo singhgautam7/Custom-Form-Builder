@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
+  { icon: LayoutDashboard, label: "Overview", href: "/" },
   { icon: FileText, label: "All Forms", href: "/forms" },
   { icon: Database, label: "Submissions", href: "/submissions" },
   { icon: Settings, label: "Settings", href: "/settings" },
@@ -58,7 +58,7 @@ export function Sidebar({ className }: { className?: string }) {
 
          <div className="space-y-1">
            {navItems.map((item) => {
-             const isActive = pathname?.startsWith(item.href)
+             const isActive = item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href)
              return (
                <Link key={item.href} href={item.href}>
                  <div

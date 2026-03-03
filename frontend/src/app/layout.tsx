@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import { Toaster } from 'sonner'
 import './globals.css'
 import { ThemeProvider } from '@/theme/ThemeProvider'
+import { QueryProvider } from '@/components/query-provider'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -29,13 +30,15 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <Toaster
-            position="bottom-right"
-            toastOptions={{
-              className: 'border-border bg-card text-foreground',
-            }}
-          />
+          <QueryProvider>
+            {children}
+            <Toaster
+              position="bottom-right"
+              toastOptions={{
+                className: 'border-border bg-card text-foreground',
+              }}
+            />
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'apps.submissions',
     'apps.notifications',
     'apps.ratelimit',
+    'apps.analytics',
 ]
 
 MIDDLEWARE = [

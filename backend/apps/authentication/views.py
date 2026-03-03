@@ -120,7 +120,7 @@ class LogoutView(GenericAPIView):
         return Response({'detail': 'Logged out.'})
 
 
-class CurrentUserView(generics.RetrieveAPIView):
+class CurrentUserView(generics.RetrieveUpdateAPIView):
     serializer_class = CurrentUserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
