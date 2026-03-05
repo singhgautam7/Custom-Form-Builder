@@ -60,7 +60,7 @@ class FormViewSet(viewsets.ModelViewSet):
         if form.is_expired():
             return Response({'detail': 'Form expired.'}, status=status.HTTP_410_GONE)
         # check published state
-        if not form.is_published and form.created_by != request.user:
+        if form.status != "PUBLISHED" and form.created_by != request.user:
             return Response({'detail': 'Form not published.'}, status=status.HTTP_404_NOT_FOUND)
         # password protection handled via verify-access endpoint
 
@@ -134,8 +134,25 @@ class FormViewSet(viewsets.ModelViewSet):
         form = resolve_form_lookup(slug)
         if form.created_by != request.user:
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
-        form.is_published = True
-        form.save(update_fields=['is_published'])
+
+        if form.status == "PUBLISHED":
+            return Response({'detail': 'Form is already published.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not form.questions.exists():
+            return Response({'detail': 'Cannot publish a form without questions.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate all questions
+        for q in form.questions.all():
+            try:
+                q.clean()
+            except DjangoValidationError as e:
+                return Response({
+                    'detail': f'Validation failed for question "{q.question_text}"',
+                    'errors': e.message_dict if hasattr(e, 'message_dict') else e.messages
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        form.status = "PUBLISHED"
+        form.save(update_fields=['status'])
         return Response({'detail': 'Form published.'})
 
     @action(detail=True, methods=['post'], url_path='unpublish')
@@ -144,8 +161,8 @@ class FormViewSet(viewsets.ModelViewSet):
         form = resolve_form_lookup(slug)
         if form.created_by != request.user:
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
-        form.is_published = False
-        form.save(update_fields=['is_published'])
+        form.status = "DRAFT"
+        form.save(update_fields=['status'])
         return Response({'detail': 'Form unpublished.'})
 
     @action(detail=True, methods=['post'])
@@ -294,10 +311,16 @@ class FormViewSet(viewsets.ModelViewSet):
         form = resolve_form_lookup(slug)
         if form.created_by != request.user:
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
-        allowed = ['is_active', 'allow_multiple_submissions', 'expires_at', 'rate_limit_enabled', 'rate_limit_count', 'rate_limit_period', 'is_password_protected', 'access_code', 'is_published', 'submission_limit']
+
+        # Edit locking
+        if form.status == "PUBLISHED":
+            allowed = ['status', 'expires_at']
+        else:
+            allowed = ['status', 'allow_multiple_submissions', 'expires_at', 'rate_limit_enabled', 'rate_limit_count', 'rate_limit_period', 'is_password_protected', 'access_code', 'submission_limit', 'title', 'description', 'success_message']
+
         for k, v in request.data.items():
             if k not in allowed:
-                return Response({'detail': f'Field {k} not allowed'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'detail': f'Field {k} not allowed or locked while published'}, status=status.HTTP_403_FORBIDDEN)
             setattr(form, k, v)
         form.save()
         return Response(FormSerializer(form).data)
@@ -314,8 +337,7 @@ class FormViewSet(viewsets.ModelViewSet):
                 'id': str(f.id),
                 'title': f.title,
                 'description': f.description,
-                'is_active': f.is_active,
-                'is_published': f.is_published,
+                'status': f.status,
                 'question_count': f.questions.count(),
                 'submission_count': f.submissions.filter(is_draft=False).count(),
                 'submission_limit': f.submission_limit,

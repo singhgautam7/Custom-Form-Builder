@@ -4,6 +4,7 @@ import { Toaster } from 'sonner'
 import './globals.css'
 import { ThemeProvider } from '@/theme/ThemeProvider'
 import { QueryProvider } from '@/components/query-provider'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -31,13 +32,15 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
-            {children}
-            <Toaster
-              position="bottom-right"
-              toastOptions={{
-                className: 'border-border bg-card text-foreground',
-              }}
-            />
+            <TooltipProvider>
+              {children}
+              <Toaster
+                position="bottom-right"
+                toastOptions={{
+                  className: 'border-border bg-card text-foreground',
+                }}
+              />
+            </TooltipProvider>
           </QueryProvider>
         </ThemeProvider>
       </body>

@@ -134,4 +134,8 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
                 transaction.on_commit(_notify_finalize)
 
-        return Response(SubmissionSerializer(submission).data)
+        # Include success_message in the response
+        response_data = SubmissionSerializer(submission).data
+        response_data['success_message'] = form.success_message or "Thank you for your submission."
+
+        return Response(response_data)

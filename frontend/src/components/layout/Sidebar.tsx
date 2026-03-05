@@ -13,7 +13,7 @@ const navItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/" },
   { icon: FileText, label: "All Forms", href: "/forms" },
   { icon: Database, label: "Submissions", href: "/submissions" },
-  { icon: Settings, label: "Settings", href: "/settings" },
+  // { icon: Settings, label: "Settings", href: "/settings" },
 ]
 
 export function Sidebar({ className }: { className?: string }) {

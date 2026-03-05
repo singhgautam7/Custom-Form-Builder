@@ -25,7 +25,7 @@ export default function FormsPage() {
           </div>
           <div className="flex items-center space-x-2">
              <Button asChild>
-               <Link href="/builder?id=new">
+               <Link href="/forms/new">
                  <Plus className="mr-2 h-4 w-4" /> Create Form
                </Link>
              </Button>

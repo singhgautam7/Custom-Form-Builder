@@ -10,15 +10,24 @@ from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
 
 
+class FormStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    PUBLISHED = "PUBLISHED", "Published"
+    CLOSED = "CLOSED", "Closed"
+    EXPIRED = "EXPIRED", "Expired"
+
 class Form(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     is_template = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
-    # publishing/draft control
-    is_published = models.BooleanField(default=True)
+    status = models.CharField(
+        max_length=20,
+        choices=FormStatus.choices,
+        default=FormStatus.DRAFT
+    )
+    success_message = models.TextField(blank=True, null=True)
     allow_multiple_submissions = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

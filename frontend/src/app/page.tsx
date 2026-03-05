@@ -53,7 +53,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center space-x-2 w-full sm:w-auto">
             <Button size="sm" className="w-full sm:w-auto" asChild>
-               <Link href="/builder?id=new">
+               <Link href="/forms/new">
                  <Plus className="mr-2 h-4 w-4" /> Create Form
                </Link>
             </Button>

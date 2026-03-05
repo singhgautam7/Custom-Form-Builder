@@ -6,7 +6,8 @@ import { IconAbc, IconMail, IconNumber123, IconCalendar, IconTextWrap, IconCircl
 import { cn } from "@/lib/utils"
 
 export function FieldPalette() {
-  const { addField } = useBuilderStore()
+  const { addField, metadata } = useBuilderStore()
+  const isPublished = metadata.status === 'PUBLISHED'
 
   const fieldTypes: { type: QuestionType, icon: React.ElementType, label: string }[] = [
     { type: 'text', icon: IconAbc, label: 'Short Text' },
@@ -30,10 +31,11 @@ export function FieldPalette() {
         {fieldTypes.map(ft => (
           <button
             key={ft.type}
+            disabled={isPublished}
             className={cn(
                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-foreground",
-               "border border-transparent hover:border-border/60 hover:bg-muted/30 transition-all",
-               "group active:scale-[0.98]"
+               "border border-transparent transition-all",
+               isPublished ? "opacity-50 cursor-not-allowed" : "hover:border-border/60 hover:bg-muted/30 group active:scale-[0.98]"
             )}
             onClick={() => addField({
               type: ft.type,
@@ -42,9 +44,9 @@ export function FieldPalette() {
             })}
           >
             <div className="bg-muted rounded p-1.5 group-hover:bg-background transition-colors border border-border/40 shadow-sm">
-              <ft.icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <ft.icon className={cn("w-4 h-4 text-muted-foreground transition-colors", !isPublished && "group-hover:text-primary")} />
             </div>
-            <span className="font-medium tracking-tight group-hover:text-foreground text-muted-foreground transition-colors">{ft.label}</span>
+            <span className={cn("font-medium tracking-tight text-muted-foreground transition-colors", !isPublished && "group-hover:text-foreground")}>{ft.label}</span>
           </button>
         ))}
       </div>

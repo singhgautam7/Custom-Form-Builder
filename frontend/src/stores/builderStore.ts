@@ -28,6 +28,7 @@ interface FormMetadata {
     description: string
     submission_limit?: number
     success_message?: string
+    status?: string
 }
 
 interface HistoryState {
@@ -59,7 +60,7 @@ interface BuilderState {
 
 export const useBuilderStore = create<BuilderState>((set, get) => ({
     fields: [],
-    metadata: { title: "Untitled Form", description: "This is a new form." },
+    metadata: { title: "Untitled Form", description: "This is a new form.", status: "DRAFT" },
     activeFieldId: null,
     history: { past: [], future: [] },
 

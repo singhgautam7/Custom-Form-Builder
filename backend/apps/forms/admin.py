@@ -17,8 +17,8 @@ def clear_submission_limit(modeladmin, request, queryset):
 
 @admin.register(Form)
 class FormAdmin(admin.ModelAdmin):
-    list_display = ('title', 'created_by', 'is_published', 'submission_limit', 'created_at')
-    list_filter = ('is_published',)
+    list_display = ('title', 'created_by', 'status', 'submission_limit', 'created_at')
+    list_filter = ('status',)
     search_fields = ('title', 'slug')
     actions = [reset_submissions, clear_submission_limit]
 

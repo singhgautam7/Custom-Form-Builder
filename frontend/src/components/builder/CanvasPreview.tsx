@@ -6,15 +6,26 @@ import { GripVertical, Copy, Trash2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 export function CanvasPreview() {
-  const { fields, activeFieldId, setActiveField, removeField, duplicateField } = useBuilderStore()
+  const { fields, activeFieldId, setActiveField, removeField, duplicateField, metadata, setMetadata } = useBuilderStore()
 
   return (
     <div className="flex-1 bg-muted/10 overflow-y-auto flex flex-col h-full relative" onClick={() => setActiveField(null)}>
        <div className="max-w-[700px] w-full mx-auto p-8 lg:p-12 pb-32 space-y-4">
 
          <div className="mb-8 p-6 bg-card border border-border/40 shadow-sm rounded-xl">
-            <h1 className="text-2xl font-semibold tracking-tight">Form Title Here</h1>
-            <p className="text-muted-foreground mt-2 text-sm">Form description placeholder goes here. Select form settings to change these properties natively checking bounds.</p>
+            <input
+              value={metadata.title}
+              onChange={(e) => setMetadata({ title: e.target.value })}
+              className="text-2xl font-semibold tracking-tight bg-transparent border-none outline-none focus:ring-0 w-full p-0 placeholder:text-muted-foreground/50"
+              placeholder="Form Title"
+            />
+            <textarea
+              value={metadata.description}
+              onChange={(e) => setMetadata({ description: e.target.value })}
+              className="text-muted-foreground mt-2 text-sm bg-transparent border-none outline-none focus:ring-0 w-full resize-none p-0 placeholder:text-muted-foreground/50 leading-relaxed"
+              placeholder="Form description placeholder goes here..."
+              rows={2}
+            />
          </div>
 
          {fields.length === 0 ? (
@@ -45,9 +56,11 @@ export function CanvasPreview() {
                      )}
                    >
                      {/* Drag Handle */}
-                     <div className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab hover:text-foreground text-muted-foreground p-1">
-                        <GripVertical className="w-4 h-4" />
-                     </div>
+                     {metadata.status !== 'PUBLISHED' && (
+                       <div className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab hover:text-foreground text-muted-foreground p-1">
+                          <GripVertical className="w-4 h-4" />
+                       </div>
+                     )}
 
                      <div className="pl-6">
                         <label className="text-[15px] font-medium block">
@@ -71,7 +84,7 @@ export function CanvasPreview() {
 
                      {/* Actions */}
                      <AnimatePresence>
-                       {activeFieldId === field.id && (
+                       {activeFieldId === field.id && metadata.status !== 'PUBLISHED' && (
                          <motion.div
                            initial={{ opacity: 0, scale: 0.9 }}
                            animate={{ opacity: 1, scale: 1 }}
